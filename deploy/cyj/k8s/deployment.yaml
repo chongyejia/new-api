@@ -30,7 +30,7 @@ spec:
             name: one-api-config
         - secretRef:
             name: one-api-secrets
-        image: registry.cn-shanghai.aliyuncs.com/chongyejia/new-api:v1-cyj-source-20261112
+        image: registry.cn-shanghai.aliyuncs.com/chongyejia/new-api@sha256:95064284871fdb7ae227e78dd570d21c8a4e46dedd6bd5fd5d4374823a11434c
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3

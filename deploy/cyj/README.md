@@ -44,6 +44,7 @@ git push codeup upstream-main cyj-internal
 
 ## 5. 云效流水线（`aixhub-new-api-prod`）与回滚
 
-- 流水线定义文件：[`deploy/cyj/yunxiao-newapi-prod.pipeline.yaml`](./yunxiao-newapi-prod.pipeline.yaml)（云效 `pipelineId: 5406341`，构建 `cyj-internal` 分支并滚动更新集群 `one-api/deployment/one-api`）。
+- 流水线定义文件：[`deploy/cyj/yunxiao-newapi-prod.pipeline.yaml`](./yunxiao-newapi-prod.pipeline.yaml)（云效 `pipelineId: 5406341`，构建 `cyj-internal` 分支并滚动更新集群 `one-api/deployment/one-api`；最近已验收发布 `5406341#2`，镜像 `v1-cyj-2026-11-22-17-02-06` / `sha256:95064284871fdb7ae227e78dd570d21c8a4e46dedd6bd5fd5d4374823a11434c`）。
+- ACR 基础镜像同步（供云效北京节点离线构建）：`base-bun:1.4.4`、`base-golang:1.26.10-alpine`、`base-debian:bookworm-slim`（`linux/amd64`）。
 - 触发前须传入 `EXPECTED_SOURCE_COMMIT=<40位SHA>`，流水线会自动生成 `v1.0.0-rc.51+cyj.<shortsha>` 写入 `VERSION`（透传至 `/api/status` 的 `version` 字段）与 ACR tag `v1-cyj-${DATETIME}`。
 - **快速回滚**：`kubectl -n one-api rollout undo deploy/one-api`（历史基线锚点镜像 `registry.cn-shanghai.aliyuncs.com/chongyejia/new-api:v1-cyj-source-20261112`，对应源码 tag `v1-cyj-source-20261112`）。
