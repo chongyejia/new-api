@@ -1,0 +1,88 @@
+name: aixhub-new-api-prod
+# Yunxiao YAML 2.0 pipeline definition for AIXHub (New API) production release.
+#
+# Contract:
+# - Manual/audited run from branch cyj-internal on https://codeup.aliyun.com/chongyejia/new-api.git
+# - Requires EXPECTED_SOURCE_COMMIT to equal checked-out HEAD SHA-1
+# - Stamps VERSION so both web/dist and /new-api expose the exact upstream base + cyj commit
+# - Builds registry.cn-shanghai.aliyuncs.com/chongyejia/new-api:v1-cyj-${DATETIME}
+# - Rolling-updates one-api/deployment/one-api container one-api with readinessProbe protection
+variables:
+  - key: EXPECTED_SOURCE_COMMIT
+    type: String
+    value: ""
+sources:
+  new_api:
+    type: codeup
+    name: new-api
+    endpoint: https://codeup.aliyun.com/chongyejia/new-api.git
+    branch: cyj-internal
+    certificate:
+      type: serviceConnection
+      serviceConnection: "xascfck88fqgww48"
+defaultWorkspace: new_api
+stages:
+  build_stage:
+    name: Build image
+    jobs:
+      build_job:
+        name: Build and push new-api image
+        steps:
+          stamp_version:
+            step: Command
+            name: Verify source commit and stamp VERSION
+            with:
+              run: |
+                set -eu
+                test -z "$(git status --porcelain --untracked-files=no)"
+                runner_untracked="$(git ls-files --others --exclude-standard)"
+                unexpected_untracked="$(
+                  printf '%s\n' "$runner_untracked" |
+                    sed '/^$/d; /^ossutil\.log$/d; /^setenv\.sh$/d'
+                )"
+                if test -n "$unexpected_untracked"; then
+                  echo "unexpected untracked build inputs:" >&2
+                  printf '%s\n' "$unexpected_untracked" >&2
+                  exit 2
+                fi
+                rm -f -- ossutil.log setenv.sh
+                test -z "$(git status --porcelain)"
+                expected_source_commit="${EXPECTED_SOURCE_COMMIT:-}"
+                if ! printf '%s\n' "$expected_source_commit" | grep -Eq '^[0-9a-f]{40}$'; then
+                  echo "EXPECTED_SOURCE_COMMIT must be an exact resolved SHA-1" >&2
+                  exit 2
+                fi
+                source_commit="$(git rev-parse HEAD)"
+                if test "$source_commit" != "$expected_source_commit"; then
+                  echo "checked-out source commit drifted from EXPECTED_SOURCE_COMMIT" >&2
+                  exit 2
+                fi
+                short_sha="$(printf '%s' "$source_commit" | cut -c1-9)"
+                printf 'v1.0.0-rc.51+cyj.%s\n' "$short_sha" > VERSION
+          docker_build_step:
+            step: ACRDockerBuild
+            name: Build new-api image
+            with:
+              serviceConnection: "g3i7mgzgit3k9yw4"
+              region: cn-shanghai
+              artifact: new_api_image
+              dockerRegistry: registry.cn-shanghai.aliyuncs.com/chongyejia/new-api
+              dockerTag: v1-cyj-${DATETIME}
+              dockerfilePath: Dockerfile
+  deploy_stage:
+    name: Rolling upgrade
+    jobs:
+      deploy_job:
+        name: Set one-api image in ACK
+        steps:
+          kubectl_set_image:
+            step: KubectlSetImage
+            name: Set image and wait for one-api rollout
+            with:
+              kubernetesCluster: "ewzrt13nptxbkqee"
+              kubectlVersion: "1.27.9"
+              namespace: one-api
+              workload: one-api
+              container: one-api
+              rolloutTimeout: 10
+              artifact: $[stages.build_stage.build_job.docker_build_step.artifacts.new_api_image]

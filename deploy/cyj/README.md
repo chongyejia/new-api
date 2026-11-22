@@ -41,3 +41,9 @@ git push codeup upstream-main cyj-internal
 
 - [`deploy/cyj/k8s/`](./k8s/) 保存从 `one-api` 命名空间导出的非敏感基线（`ConfigMap`、`Deployment`、`Redis`、`Service`、`Ingress`），**严禁**提交任何 Secret（`one-api-secrets` 仅存在于集群侧，禁止落库，提交前依赖全局 `gitleaks` 守卫拦截）。
 - 构建生产镜像时应固定 Git Commit SHA 作为镜像 Tag，同步记录 `vcs.revision` 并在更新 [`k8s/deployment.yaml`](./k8s/deployment.yaml) 后经审批变更线上 Deployment。
+
+## 5. 云效流水线（`aixhub-new-api-prod`）与回滚
+
+- 流水线定义文件：[`deploy/cyj/yunxiao-newapi-prod.pipeline.yaml`](./yunxiao-newapi-prod.pipeline.yaml)（构建 `cyj-internal` 分支并滚动更新集群 `one-api/deployment/one-api`）。
+- 触发前须传入 `EXPECTED_SOURCE_COMMIT=<40位SHA>`，流水线会自动生成 `v1.0.0-rc.51+cyj.<shortsha>` 写入 `VERSION`（透传至 `/api/status` 的 `version` 字段）与 ACR tag `v1-cyj-${DATETIME}`。
+- **快速回滚**：`kubectl -n one-api rollout undo deploy/one-api`（历史基线锚点镜像 `registry.cn-shanghai.aliyuncs.com/chongyejia/new-api:v1-cyj-source-20261112`，对应源码 tag `v1-cyj-source-20261112`）。
